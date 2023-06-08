@@ -342,6 +342,8 @@ enum {
 };
 
 
+
+
 /* add these declarations here so we can call these functions earlier */
 static inline u8 has_new_bits(u8* virgin_map);
 
@@ -362,6 +364,12 @@ u8 server_wait = 0;
 u8 poll_wait = 0;
 u8 socket_timeout = 0;
 u8 terminate_child = 0;
+
+
+// leehung
+static u8* stats_log_path = NULL;
+FILE* fp_stats = NULL;
+s32 pre_time = 0;
 
 
 static u64 get_cur_time(void);
@@ -4646,6 +4654,16 @@ static void show_stats(void) {
   } else SAYF("\r");
 
   /* Hallelujah! */
+  /*leehung: Record stats to file each 3 seconds*/
+  const int period = 3;
+  int rec = 0;
+  u64 _delta = cur_ms - start_time;
+  s32 _second = (_delta / 1000) % 60;
+  if (_second % period == 0 && pre_time != _second) {
+    fprintf(fp_stats, "%llu,%-21s,%-5s,%0.02f%%,%s,%s\n", cur_ms - start_time, DI(total_execs), DI(queued_paths), t_byte_ratio,DI(unique_crashes));
+    pre_time = _second;
+    rec = 1;
+  }
 
   fflush(0);
 
@@ -8314,6 +8332,15 @@ int main(int argc, char** argv) {
   setup_dirs_fds();
   read_testcases();
   load_auto();
+
+  /*leehung: 记录fuzzing状态文件，*/
+  stats_log_path = alloc_printf("%s/stats_record.csv", out_dir);
+  fp_stats = fopen(stats_log_path, "w");
+  if (fp_stats == NULL) {
+    FATAL("Failed to open stats_record.csv");
+  }
+  // write head to csv
+  fprintf(fp_stats, "run time,total execs,total paths,map density,unique crashes\n");
 
   pivot_inputs();
 
